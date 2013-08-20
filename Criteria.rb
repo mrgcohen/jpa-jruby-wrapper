@@ -2,16 +2,22 @@ class Criteria
   DATA = Java::HarbingerSdkData
   SDK = Java::HarbingerSdk
 
-  attr_accessor :builder, :criteria, :limit, :roots
+  attr_accessor :builder, :criteria, :limit, :roots, :page, :select
+
+  def sql
+     @roots.collect{ |t,v| "table:#{t}: #{v.toString}"}
+  end
 
   def initialize(em=nil)
     # confirm em exists
-    handle_entity_manager(em)
+    em = handle_entity_manager(em)
 
     # get builder and startup
     @builder = em.getCriteriaBuilder()
     @criteria = @builder.createQuery()
     @roots = {}
+
+    @limit = 0
 
     # stores from table
     @from = nil
@@ -34,51 +40,133 @@ class Criteria
   def from(table_name)
     @from = @roots[table_name] = @criteria.from(eval("Java::Harbinger.sdk.data.#{table_name}.java_class"))
     @from_table = table_name
-    @criteria.select(@roots[table_name])
+    @select = @criteria.select(@roots[table_name])
+
     self
   end
 
   # between 2 values as disjunction or conjunction (by default conjunction)
   def between(table, column, min, max, and_or="and")
     if and_or == "and"
-      @conjunction = @builder.between(@roots[table].get(column),min,max)
+      and_exp(@builder.between(@roots[table].get(column),min,max))
     else
-      @disjunction = @builder.between(@roots[table].get(column),min,max)
+      or_exp(@builder.between(@roots[table].get(column),min,max))
     end
     self
   end
 
   # equals only right now as a conjunction (default) or disjunction
-  def where(table, column, value, and_or="and")
+  def where(table, column, value, and_or="and", ignore_case=false)
+    if ignore_case
+      return where_ignore_case(table, column, value, and_or)
+    end
     if and_or == "and"
-      @use_conjunction = true
-      @conjunction = @builder.and(@conjunction,@builder.equal(@roots[table].get(column),value))
+      and_exp(@builder.equal(@roots[table].get(column),value))
     else # or
-      @use_disjunction = true
-      @disjunction = @builder.and(@disjunction,@builder.equal(@roots[table].get(column),value))
+      or_exp(@builder.equal(@roots[table].get(column),value))
+    end
+    self
+  end
+
+  # equals only right now as a conjunction (default) or disjunction
+  def where_ignore_case(table, column, value, and_or="and")
+    if and_or == "and"
+      and_exp(@builder.equal(@builder.lower(@roots[table].get(column)),value.downcase))
+    else # or
+      or_exp(@builder.equal(@builder.lower(@roots[table].get(column)),value.downcase))
+    end
+    self
+  end
+  
+  def is_not_null(table, column, and_or="and")
+    if and_or == "and"
+      and_exp(@builder.isNotNull(@roots[table].get(column)))
+    else # or
+      or_exp(@builder.isNotNull(@roots[table].get(column)))
+    end
+    self
+  end
+  
+  def is_null(table, column, and_or="and")
+    if and_or == "and"
+      and_exp(@builder.isNull(@roots[table].get(column)))
+    else # or
+      or_exp(@builder.isNull(@roots[table].get(column)))
+    end
+    self
+  end
+
+  def gt(table,column,value, and_or="and")
+    if and_or == "and"
+      and_exp(@builder.gt(@roots[table].get(column),value))
+    else
+      or_exp(@builder.gt(@roots[table].get(column),value))
+    end
+  end
+
+  def ge(table,column,value, and_or="and")
+    if and_or == "and"
+      and_exp(@builder.ge(@roots[table].get(column),value))
+    else
+      or_exp(@builder.ge(@roots[table].get(column),value))
+    end
+  end
+
+  def lessThanOrEqualTo(*args)
+    le(*args)
+  end
+
+  def lt(table,column,value, and_or="and")
+    if and_or == "and"
+      and_exp(@builder.lt(@roots[table].get(column),value))
+    else
+      or_exp(@builder.lt(@roots[table].get(column),value))
+    end
+  end
+
+  def le(table,column,value, and_or="and")
+    if and_or == "and"
+      and_exp(@builder.le(@roots[table].get(column),value))
+    else
+      or_exp(@builder.le(@roots[table].get(column),value))
+    end
+  end
+
+  # like where addition as as conjunction (default) or disjunction
+  def like_ignore_case(table, column, value, and_or="and")
+    if and_or == "and"
+      and_exp(@builder.like(@builder.lower(@roots[table].get(column)),value.downcase))
+    else
+      or_exp(@builder.like(@builder.lower(@roots[table].get(column)),value.downcase))
     end
     self
   end
 
   # like where addition as as conjunction (default) or disjunction
-  def like(table, column, value, and_or="and")
+  def like(table, column, value, and_or="and", ignore_case=false)
+    return like_ignore_case(table,column,value,and_or) if ignore_case
     if and_or == "and"
       and_exp(@builder.like(@roots[table].get(column),value))
     else
       or_exp(@builder.like(@roots[table].get(column),value))
     end
+    self
   end
 
   # add expression as disjunction (or)
   def or_exp(expression)
     @use_disjunction = true
     @disjunction = @builder.and(@disjunction,expression)
+
+    self
   end
 
   # add expression as conjunction (and)
   def and_exp(expression)
     @use_conjunction = true
     @conjunction = @builder.and(@conjunction,expression)
+
+    self
   end
 
   # join (fetch) more tables (default to inner join, use "left" for outer)
@@ -91,6 +179,7 @@ class Criteria
       # default to inner join
       @roots[table] = @roots[from].join(table)
     end
+
     self
   end
 
@@ -124,8 +213,9 @@ class Criteria
 
   # set a limit, optional pass in paging settings
   def limit(per_page,page=0)
-    @limit = num
-    page(page,per_page) if page > 0
+    @limit = per_page
+    @page = page
+
     self
   end
 
@@ -134,11 +224,27 @@ class Criteria
     begin
       @criteria.where(@builder.and(@conjunction)) if @use_conjunction
       @criteria.where(@builder.or(@disjunction)) if @use_disjunction
-      if raw
-        result = @em.createQuery(@criteria).setMaxResults(20).getResultList()
+
+      query = @em.createQuery(@criteria)
+
+      # set page if set
+      if @page and @limit
+        query.setFirstResult(@page.to_i*@limit)
       else
-        result = @em.createQuery(@criteria).setMaxResults(20).getResultList().to_a
+        query.setFirstResult(@page.to_i || 0)
       end
+
+      # set limit if exists
+      if @limit
+        query.setMaxResults(@limit)
+      end
+
+      # show raw arraylist or ruby array
+      result = query.getResultList()
+      unless raw
+        result = result.to_a
+      end
+      
       # close if needed
       @em.close if @em_local
     rescue Exception => e
@@ -150,7 +256,15 @@ class Criteria
 
   # get an entity manager if need one
   def self.em
-    SDK::DataUtils.getEntityManager()
+    Java::HarbingerSdk::DataUtils.getEntityManager()
+  end
+
+  def close_em
+    begin
+      @em.close
+    rescue
+      # just try catch failure
+    end
   end
 
   protected
