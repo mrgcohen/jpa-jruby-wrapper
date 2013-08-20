@@ -1,6 +1,8 @@
 class Criteria
   DATA = Java::HarbingerSdkData
   SDK = Java::HarbingerSdk
+  FROM = "Java::Harbinger.sdk.data"
+  DU = Java::HarbingerSdk::DataUtils
 
   attr_accessor :builder, :criteria, :limit, :roots, :page, :select
 
@@ -38,7 +40,7 @@ class Criteria
 
   # select from table
   def from(table_name)
-    @from = @roots[table_name] = @criteria.from(eval("Java::Harbinger.sdk.data.#{table_name}.java_class"))
+    @from = @roots[table_name] = @criteria.from(eval("#{FROM}.#{table_name}.java_class"))
     @from_table = table_name
     @select = @criteria.select(@roots[table_name])
 
@@ -77,7 +79,7 @@ class Criteria
     end
     self
   end
-  
+
   def is_not_null(table, column, and_or="and")
     if and_or == "and"
       and_exp(@builder.isNotNull(@roots[table].get(column)))
@@ -86,7 +88,7 @@ class Criteria
     end
     self
   end
-  
+
   def is_null(table, column, and_or="and")
     if and_or == "and"
       and_exp(@builder.isNull(@roots[table].get(column)))
@@ -244,7 +246,7 @@ class Criteria
       unless raw
         result = result.to_a
       end
-      
+
       # close if needed
       @em.close if @em_local
     rescue Exception => e
@@ -256,7 +258,7 @@ class Criteria
 
   # get an entity manager if need one
   def self.em
-    Java::HarbingerSdk::DataUtils.getEntityManager()
+    DU.getEntityManager()
   end
 
   def close_em
