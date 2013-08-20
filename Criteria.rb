@@ -4,7 +4,7 @@ class Criteria
   FROM = "Java::Harbinger.sdk.data"
   DU = Java::HarbingerSdk::DataUtils
 
-  attr_accessor :builder, :criteria, :limit, :roots, :page, :select
+  attr_accessor :builder, :criteria, :limit, :roots, :page, :select, :alias
 
   def sql
      @roots.collect{ |t,v| "table:#{t}: #{v.toString}"}
@@ -33,15 +33,21 @@ class Criteria
     @disjunction = @builder.disjunction()
     @use_disjunction = false
 
+    # alias defaults to basic hash
+    @alias = {}
+
     self
   end
 
   # chaining methods
 
   # select from table
-  def from(table_name)
-    @from = @roots[table_name] = @criteria.from(eval("#{FROM}.#{table_name}.java_class"))
+  def from(table_name, options = {})
+    options[:alias] ||= table_name
+
+    @alias[options[:alias]] = @from = @roots[table_name] = @criteria.from(eval("#{FROM}.#{table_name}.java_class"))
     @from_table = table_name
+
     @select = @criteria.select(@roots[table_name])
 
     self
@@ -50,11 +56,15 @@ class Criteria
   # between 2 values as disjunction or conjunction (by default conjunction)
   def between(table, column, min, max, and_or="and")
     if and_or == "and"
-      and_exp(@builder.between(@roots[table].get(column),min,max))
+      and_exp(@builder.between(@alias[table].get(column),min,max))
     else
-      or_exp(@builder.between(@roots[table].get(column),min,max))
+      or_exp(@builder.between(@alias[table].get(column),min,max))
     end
     self
+  end
+
+  def not(method,*options)
+    self.send(method, options)
   end
 
   # equals only right now as a conjunction (default) or disjunction
@@ -63,9 +73,9 @@ class Criteria
       return where_ignore_case(table, column, value, and_or)
     end
     if and_or == "and"
-      and_exp(@builder.equal(@roots[table].get(column),value))
+      and_exp(@builder.equal(@alias[table].get(column),value))
     else # or
-      or_exp(@builder.equal(@roots[table].get(column),value))
+      or_exp(@builder.equal(@alias[table].get(column),value))
     end
     self
   end
@@ -73,44 +83,26 @@ class Criteria
   # equals only right now as a conjunction (default) or disjunction
   def where_ignore_case(table, column, value, and_or="and")
     if and_or == "and"
-      and_exp(@builder.equal(@builder.lower(@roots[table].get(column)),value.downcase))
+      and_exp(@builder.equal(@builder.lower(@alias[table].get(column)),value.downcase))
     else # or
-      or_exp(@builder.equal(@builder.lower(@roots[table].get(column)),value.downcase))
-    end
-    self
-  end
-
-  def is_not_null(table, column, and_or="and")
-    if and_or == "and"
-      and_exp(@builder.isNotNull(@roots[table].get(column)))
-    else # or
-      or_exp(@builder.isNotNull(@roots[table].get(column)))
-    end
-    self
-  end
-
-  def is_null(table, column, and_or="and")
-    if and_or == "and"
-      and_exp(@builder.isNull(@roots[table].get(column)))
-    else # or
-      or_exp(@builder.isNull(@roots[table].get(column)))
+      or_exp(@builder.equal(@builder.lower(@alias[table].get(column)),value.downcase))
     end
     self
   end
 
   def gt(table,column,value, and_or="and")
     if and_or == "and"
-      and_exp(@builder.gt(@roots[table].get(column),value))
+      and_exp(@builder.gt(@alias[table].get(column),value))
     else
-      or_exp(@builder.gt(@roots[table].get(column),value))
+      or_exp(@builder.gt(@alias[table].get(column),value))
     end
   end
 
   def ge(table,column,value, and_or="and")
     if and_or == "and"
-      and_exp(@builder.ge(@roots[table].get(column),value))
+      and_exp(@builder.ge(@alias[table].get(column),value))
     else
-      or_exp(@builder.ge(@roots[table].get(column),value))
+      or_exp(@builder.ge(@alias[table].get(column),value))
     end
   end
 
@@ -120,26 +112,26 @@ class Criteria
 
   def lt(table,column,value, and_or="and")
     if and_or == "and"
-      and_exp(@builder.lt(@roots[table].get(column),value))
+      and_exp(@builder.lt(@alias[table].get(column),value))
     else
-      or_exp(@builder.lt(@roots[table].get(column),value))
+      or_exp(@builder.lt(@alias[table].get(column),value))
     end
   end
 
   def le(table,column,value, and_or="and")
     if and_or == "and"
-      and_exp(@builder.le(@roots[table].get(column),value))
+      and_exp(@builder.le(@alias[table].get(column),value))
     else
-      or_exp(@builder.le(@roots[table].get(column),value))
+      or_exp(@builder.le(@alias[table].get(column),value))
     end
   end
 
   # like where addition as as conjunction (default) or disjunction
   def like_ignore_case(table, column, value, and_or="and")
     if and_or == "and"
-      and_exp(@builder.like(@builder.lower(@roots[table].get(column)),value.downcase))
+      and_exp(@builder.like(@builder.lower(@alias[table].get(column)),value.downcase))
     else
-      or_exp(@builder.like(@builder.lower(@roots[table].get(column)),value.downcase))
+      or_exp(@builder.like(@builder.lower(@alias[table].get(column)),value.downcase))
     end
     self
   end
@@ -148,9 +140,9 @@ class Criteria
   def like(table, column, value, and_or="and", ignore_case=false)
     return like_ignore_case(table,column,value,and_or) if ignore_case
     if and_or == "and"
-      and_exp(@builder.like(@roots[table].get(column),value))
+      and_exp(@builder.like(@alias[table].get(column),value))
     else
-      or_exp(@builder.like(@roots[table].get(column),value))
+      or_exp(@builder.like(@alias[table].get(column),value))
     end
     self
   end
@@ -172,15 +164,23 @@ class Criteria
   end
 
   # join (fetch) more tables (default to inner join, use "left" for outer)
-  def join(table,from=nil,type="inner")
-    from = @from_table if from.nil?
-    case type
+  def join(table,options={})
+    # defaults
+    options[:type] ||= "inner"
+    options[:alias] ||= table
+
+    from = @roots[from_table] if options[:from].nil?
+    from = @alias[options[:from]] if options[:from]
+
+    case options[:type]
     when "left"
-      @roots[table] = @roots[from].join(table, Java::javax.persistence.criteria.JoinType::LEFT)
+      @roots[table] = from.join(table, Java::javax.persistence.criteria.JoinType::LEFT)
     else
       # default to inner join
-      @roots[table] = @roots[from].join(table)
+      @roots[table] = from.join(table)
     end
+
+    @alias[options[:alias]] = @roots[table]
 
     self
   end
@@ -189,10 +189,10 @@ class Criteria
   def in(table,column,list,and_or="and")
     if and_or == "and"
       @use_conjunction = true
-      @conjunction = @builder.and(@conjunction,@builder.in(@roots[table].get(column),list))
+      @conjunction = @builder.and(@conjunction,@builder.in(@alias[table].get(column),list))
     else # or
       @use_disjunction = true
-      @disjunction = @builder.and(@disjunction,@builder.in(@roots[table].get(column),list))
+      @disjunction = @builder.and(@disjunction,@builder.in(@alias[table].get(column),list))
     end
     self
   end
