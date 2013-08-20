@@ -29,4 +29,23 @@ It should automatically create em and close it when query is complete or you can
 
 # return java object or array
 @results = @query.list(true)
+
+# another example
+@radExams = Criteria.new(entity_manager).from("RadExam")
+                          .join("radExamTime")
+                          .join("radExamPersonnel")
+                          .join("ordering","radExamPersonnel")
+                          .where("ordering","id",ordering_id)
+                          .limit(10)
+                          .order("radExamTime","endExam","desc")
+                          .list
+                          
+# another example for between
+@radExams = Criteria.new(em).from("RadExam")
+                          .join("radExamTime")
+                          .between("radExamTime","endExam",Time.parse(startTime),Time.parse(endTime))
+                          .list
+                          
+# use tojson
+@radExams.collect{|e| e.rad_exam_to_json(e)}
 ```
