@@ -19,7 +19,8 @@ It should automatically create em and close it when query is complete or you can
                           .limit(30).list
                           
 # or pass it an entity_manager
-# Criteria.new(entity_manager).from("Table")
+entity_manager = Criteria.em
+Criteria.new(entity_manager).from("Table")
                           
 @query = Criteria.new.from("Table")
 @query.in("Table","column",list)
