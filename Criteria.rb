@@ -4,7 +4,7 @@ class Criteria
   FROM = "Java::Harbinger.sdk.data"
   DU = Java::HarbingerSdk::DataUtils
 
-  attr_accessor :builder, :criteria, :limit, :roots, :page, :select, :alias
+  attr_accessor :builder, :criteria, :limit, :roots, :page, :select, :alias, :from_table
 
   def sql
      @roots.collect{ |t,v| "table:#{t}: #{v.toString}"}
@@ -45,7 +45,17 @@ class Criteria
   def from(table_name, options = {})
     options[:alias] ||= table_name
 
-    @alias[options[:alias]] = @from = @roots[table_name] = @criteria.from(eval("#{FROM}.#{table_name}.java_class"))
+    # add to roots
+    @roots[table_name] = @criteria.from(eval("#{FROM}.#{table_name}.java_class"))
+
+    # set from
+    @from = @roots[table_name]
+
+    # set alias for both
+    @alias[options[:alias]] = @roots[table_name]
+    @alias[table_name] = @roots[table_name]
+
+    # set table name for from
     @from_table = table_name
 
     @select = @criteria.select(@roots[table_name])
@@ -168,19 +178,20 @@ class Criteria
     # defaults
     options[:type] ||= "inner"
     options[:alias] ||= table
-
-    from = @roots[from_table] if options[:from].nil?
-    from = @alias[options[:from]] if options[:from]
+    options[:from] ||= @from_table
 
     case options[:type]
     when "left"
-      @roots[table] = from.join(table, Java::javax.persistence.criteria.JoinType::LEFT)
+      @roots[table] = @alias[options[:from]].join(table, Java::javax.persistence.criteria.JoinType::LEFT)
     else
       # default to inner join
-      @roots[table] = from.join(table)
+      @roots[table] = @alias[options[:from]].join(table)
     end
 
+    # set alias
+    # @alias[options[:from]] = @roots[table]
     @alias[options[:alias]] = @roots[table]
+    @alias[table] = @roots[table]
 
     self
   end

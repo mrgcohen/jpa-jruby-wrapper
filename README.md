@@ -7,7 +7,7 @@ Wrap the jpa calls with jruby
 
 This is my initial stab.. sort of hacked together to work.  Probably should be made better but just needed something to start with
 
-It should automatically create em and close it when query is complete or you can pass it an em to use on init
+It should automatically create em and close it when query is complete or you can pass it an em to use on init. Passing the em is preferred. 
 
 ## Examples
 ```ruby
