@@ -4,7 +4,7 @@ class Criteria
   FROM = "Java::Harbinger.sdk.data"
   DU = Java::HarbingerSdk::DataUtils
 
-  attr_accessor :builder, :criteria, :limit, :roots, :page, :select, :alias, :from_table
+  attr_accessor :builder, :criteria, :limit, :roots, :page, :select, :alias, :from_table, :from, :disjunction, :conjunction
 
   def sql
      @roots.collect{ |t,v| "table:#{t}: #{v.toString}"}
@@ -96,6 +96,24 @@ class Criteria
       and_exp(@builder.equal(@builder.lower(@alias[table].get(column)),value.downcase))
     else # or
       or_exp(@builder.equal(@builder.lower(@alias[table].get(column)),value.downcase))
+    end
+    self
+  end
+
+  def is_not_null(table, column, and_or="and")
+    if and_or == "and"
+      and_exp(@builder.isNotNull(@roots[table].get(column)))
+    else # or
+      or_exp(@builder.isNotNull(@roots[table].get(column)))
+    end
+    self
+  end
+
+  def is_null(table, column, and_or="and")
+    if and_or == "and"
+      and_exp(@builder.isNull(@roots[table].get(column)))
+    else # or
+      or_exp(@builder.isNull(@roots[table].get(column)))
     end
     self
   end
