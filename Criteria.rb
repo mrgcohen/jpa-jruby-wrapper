@@ -191,6 +191,24 @@ class Criteria
     self
   end
 
+  # provides dot notation for join
+  # joins("patientMrn.patient") now instead of join("patientMrn").join("patient",:from=>"patientMrn")
+  def joins(tables,options={})
+    # now check for dot notiation
+    dot_notation = tables.split "."
+    parent_table = nil
+    options = {}
+    dot_notation.each do |j_table|
+      options[:from] = parent_table unless parent_table.nil?
+      options[:alias] = j_table unless parent_table.nil?
+      puts "join("+j_table+","+options.inspect+")"
+      join(j_table,options)
+      parent_table = j_table
+    end
+
+    self
+  end
+
   # join (fetch) more tables (default to inner join, use "left" for outer)
   def join(table,options={})
     # defaults
