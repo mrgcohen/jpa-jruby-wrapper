@@ -41,6 +41,15 @@ Criteria.new(entity_manager).from("Table")
                           .order("radExamTime","endExam","desc")
                           .list
                           
+# re-write in dot notation
+@radExams = Criteria.new(entity_manager).from("RadExam")
+                          .join("radExamTime")
+                          .join("radExamPersonnel.ordering")
+                          .where("ordering","id",ordering_id)
+                          .limit(10)
+                          .order("radExamTime","endExam","desc")
+                          .list
+                          
 # another example for between
 @radExams = Criteria.new(em).from("RadExam")
                           .join("radExamTime")
