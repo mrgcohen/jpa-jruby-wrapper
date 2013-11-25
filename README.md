@@ -59,3 +59,15 @@ Criteria.new(entity_manager).from("Table")
 # use tojson
 @radExams.collect{|e| e.rad_exam_to_json(e)}
 ```
+
+### Latest Version can now do joins with multiple tables and optionally get the count instead of the results
+
+```bash
+jruby-1.6.8 :195 > a = Crit.new(em).from("RadExam",:count => true)
+                          .joins("currentStatus.tripStatus")
+                          .where("tripStatus","status","prelim")
+                          .joins("radExamTime")
+                          .between("radExamTime","endExam",Time.now-2.years,Time.now-7.days)
+                          .list
+ => 9382 
+```
