@@ -4,7 +4,7 @@ class Criteria
   FROM = "Java::Harbinger.sdk.data"
   DU = Java::HarbingerSdk::DataUtils
 
-  attr_accessor :builder, :criteria, :limit, :roots, :page, :select, :alias, :from_table, :from, :disjunction, :conjunction
+  attr_accessor :builder, :criteria, :limit, :roots, :page, :select, :alias, :from_table, :from, :disjunction, :conjunction, :count
 
   def sql
      @roots.collect{ |t,v| "table:#{t}: #{v.toString}"}
@@ -58,7 +58,13 @@ class Criteria
     # set table name for from
     @from_table = table_name
 
-    @select = @criteria.select(@roots[table_name])
+    if options[:count]
+      self.count = true
+      @select = @criteria.select(@builder.count(@roots[table_name]))
+    else
+      self.count = false
+      @select = @criteria.select(@roots[table_name])
+    end
 
     self
   end
@@ -292,6 +298,7 @@ class Criteria
       result = query.getResultList()
       unless raw
         result = result.to_a
+        result = result.first if count
       end
 
       # close if needed
