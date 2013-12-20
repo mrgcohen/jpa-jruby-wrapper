@@ -14,12 +14,15 @@ It should automatically create em and close it when query is complete or you can
 ### Latest Version can now do joins with multiple tables and optionally get the count instead of the results
 
 ```bash
-jruby-1.6.8 :195 > a = Crit.new(em).from("RadExam",:count => true)
+jruby-1.6.8 :194 > @audit = {}
+jruby-1.6.8 :195 > a = Crit.new(em,audit).from("RadExam",:count => true)
                           .joins("currentStatus.tripStatus")
                           .where("tripStatus","status","prelim")
                           .joins("radExamTime")
                           .between("radExamTime","endExam",Time.now-2.years,Time.now-7.days)
                           .list
+jruby-1.6.8 :196 > # Pass @audit directly to audit method in usual sdk 
+                          
  => 9382 
 ```
 
