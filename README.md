@@ -30,7 +30,7 @@ jruby-1.6.8 :196 > # Pass @audit directly to audit method in usual sdk
 
 ```ruby
 
-@new_crit = Criteria.new.from("Table")
+@new_crit = Criteria.new(em,audit).from("Table")
                           .join("table2")
                           .join("table3")
                           .where("table1","column",value)
@@ -38,9 +38,9 @@ jruby-1.6.8 :196 > # Pass @audit directly to audit method in usual sdk
                           
 # or pass it an entity_manager
 entity_manager = Criteria.em
-Criteria.new(entity_manager).from("Table")
+Criteria.new(entity_manager,audit).from("Table")
                           
-@query = Criteria.new.from("Table")
+@query = Criteria.new(entity_manager,audit).from("Table")
 @query.in("Table","column",list)
 
 # return ruby array
