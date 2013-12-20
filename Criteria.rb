@@ -4,13 +4,18 @@ class Criteria
   FROM = "Java::Harbinger.sdk.data"
   DU = Java::HarbingerSdk::DataUtils
 
-  attr_accessor :builder, :criteria, :limit, :roots, :page, :select, :alias, :from_table, :from, :disjunction, :conjunction, :count
+  attr_accessor :builder, :criteria, :limit, :roots, :page, :select, :alias, :from_table, :from, :disjunction, :conjunction, :count, :audit
 
   def sql
      @roots.collect{ |t,v| "table:#{t}: #{v.toString}"}
   end
 
-  def initialize(em=nil)
+  def initialize(em=nil,audit=nil)
+    if audit
+      @audit = audit 
+    else
+      @audit = {}
+    end
     # confirm em exists
     em = handle_entity_manager(em)
 
@@ -207,7 +212,6 @@ class Criteria
     dot_notation.each do |j_table|
       options[:from] = parent_table unless parent_table.nil?
       options[:alias] = j_table unless parent_table.nil?
-      puts "join("+j_table+","+options.inspect+")"
       join(j_table,options)
       parent_table = j_table
     end
@@ -298,8 +302,12 @@ class Criteria
       result = query.getResultList()
       unless raw
         result = result.to_a
+        # if getting count instead of result set
         result = result.first if count
       end
+
+      # add to audit
+      audit_table(@from_table.underscore.pluralize,result.to_a)
 
       # close if needed
       @em.close if @em_local
@@ -308,6 +316,17 @@ class Criteria
       throw e
     end
     return result
+  end
+
+  def audit_table(table_name,object,&accessor)
+    @audit[table_name] = Array.new unless @audit[table_name]
+    if accessor
+      @audit[table_name] |= object.collect &accessor
+    elsif object.class == Array
+      @audit[table_name] |= object
+    else
+      @audit[table_name] << object
+    end
   end
 
   # get an entity manager if need one
