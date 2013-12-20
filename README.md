@@ -15,7 +15,7 @@ It should automatically create em and close it when query is complete or you can
 
 ```bash
 jruby-1.6.8 :194 > @audit = {}
-jruby-1.6.8 :195 > a = Crit.new(em,audit).from("RadExam",:count => true)
+jruby-1.6.8 :195 > a = Crit.new(em,@audit).from("RadExam",:count => true)
                           .joins("currentStatus.tripStatus")
                           .where("tripStatus","status","prelim")
                           .joins("radExamTime")
@@ -30,7 +30,7 @@ jruby-1.6.8 :196 > # Pass @audit directly to audit method in usual sdk
 
 ```ruby
 
-@new_crit = Criteria.new(em,audit).from("Table")
+@new_crit = Criteria.new(em,@audit).from("Table")
                           .join("table2")
                           .join("table3")
                           .where("table1","column",value)
@@ -38,9 +38,9 @@ jruby-1.6.8 :196 > # Pass @audit directly to audit method in usual sdk
                           
 # or pass it an entity_manager
 entity_manager = Criteria.em
-Criteria.new(entity_manager,audit).from("Table")
+Criteria.new(entity_manager,@audit).from("Table")
                           
-@query = Criteria.new(entity_manager,audit).from("Table")
+@query = Criteria.new(entity_manager,@audit).from("Table")
 @query.in("Table","column",list)
 
 # return ruby array
